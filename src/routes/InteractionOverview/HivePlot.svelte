@@ -100,3 +100,5 @@
     {/each}
   </g>
 </svg>
+
+<svg bind:this={svg} width={width} height={height}></svg>
