@@ -1,112 +1,102 @@
-<!-- HivePlot.svelte -->
+<!-- src/components/HivePlot.svelte -->
 <script>
   import { onMount } from 'svelte';
-  // import { fetchGenesData } from './gene.js';
-  // import { fetchInteractionsData } from './Interactions.js';
-  // // Variables to store the fetched data
-  let genes = [];
-  let interactions = [];
-  function calculateNodePositions() {
-    // Create separate arrays to store genes for each group
-    const regulators = [];
-    const managers = [];
-    const workhorses = [];
+  import * as d3 from 'd3';
 
-    // Categorize genes based on their "axes" property
-    genes.forEach((gene) => {
-      if (gene.axes === 'regulator') {
-        regulators.push(gene);
-      } else if (gene.axes === 'manager') {
-        managers.push(gene);
-      } else if (gene.axes === 'workhorse') {
-        workhorses.push(gene);
-      }
-    });
+  export let genes;
+  export let interactions;
 
-    // Calculate the angles for each gene in radians
-    const angleStepRegulator = (2 * Math.PI) / regulators.length;
-    const angleStepManager = (2 * Math.PI) / managers.length;
-    const angleStepWorkhorse = (2 * Math.PI) / workhorses.length;
+  const width = 600;
+  const height = 600;
+  const radius = 200;
+  const numAxes = 3; // Number of axes (you can adjust this based on your data)
+  const angleBetweenAxes = (2 * Math.PI) / numAxes;
+  const axisNames = ['regulator', 'workhorse', 'manager'];
 
-    // Calculate the distance from the center for each gene
-    const minDistance = 50;
-    const maxDistance = 300;
-    const distanceStepRegulator = (maxDistance - minDistance) / (regulators.length - 1);
-    const distanceStepManager = (maxDistance - minDistance) / (managers.length - 1);
-    const distanceStepWorkhorse = (maxDistance - minDistance) / (workhorses.length - 1);
+  let svg;
 
-    // Set the x and y coordinates for each gene
-    regulators.forEach((gene, index) => {
-      gene.x = minDistance + distanceStepRegulator * index;
-      gene.y = 0;
-    });
-
-    managers.forEach((gene, index) => {
-      gene.x = maxDistance - distanceStepManager * index;
-      gene.y = maxDistance;
-    });
-
-    workhorses.forEach((gene, index) => {
-      gene.x = minDistance + distanceStepWorkhorse * index;
-      gene.y = maxDistance;
-    });
-
-    // Now you can calculate the positions of interactions between genes using their x and y coordinates.
-    // You can set the control points for the quadratic Bezier curves here.
-    interactions.forEach((interaction) => {
-      interaction.controlPointX = (interaction.fromGene.x + interaction.toGene.x) / 2;
-      interaction.controlPointY = (interaction.fromGene.y + interaction.toGene.y) / 2;
-    });
+  // Function to calculate the x, y coordinates of a gene based on the axis
+  function getPosition(gene, axis) {
+    const angle = axis * angleBetweenAxes - Math.PI / 2;
+    const x = radius * Math.cos(angle);
+    const y = radius * Math.sin(angle);
+    return { x, y };
   }
 
-  onMount(async () => {
-    try {
-      // Fetch the gene data
-      const genesResponse = await fetch('https://vda-lab.github.io/assets/genes.json');
-      genes = await genesResponse.json();
-
-      // Fetch the interaction data
-      const interactionsResponse = await fetch('https://vda-lab.github.io/assets/interactions.json');
-      interactions = await interactionsResponse.json();
-
-      // Calculate node positions for the hive plot
-      calculateNodePositions();
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      // You can handle errors here, e.g., show an error message or retry fetching.
-    }
+  onMount(() => {
+    // You can add interactivity or additional features here if required
   });
-
 </script>
 
 <style>
-  /* Add your Hiveplot styles here */
+  /* Add your CSS styling for the Hive Plot visualization here */
+  .gene-node {
+    fill: blue;
+    stroke: #fff;
+    cursor: pointer;
+  }
+
+  .gene-node-text {
+    font-size: 12px;
+  }
+
+  .gene-edge {
+    stroke: gray;
+    stroke-width: 1;
+  }
 </style>
 
-<!-- Your Hiveplot visualization code goes here -->
-<div class="hiveplot-container">
-  <svg width="600" height="600">
-    <!-- Example code to draw the hive plot -->
-    <!-- Replace this with your hive plot visualization code -->
+<svg bind:this={svg} width={width} height={height}>
+  <g transform={`translate(${width / 2}, ${height / 2})`}>
+    <!-- Draw axes -->
+    {#each axisNames as axisName, i}
+      <line
+        x1={radius * Math.cos(i * angleBetweenAxes - Math.PI / 2)}
+        y1={radius * Math.sin(i * angleBetweenAxes - Math.PI / 2)}
+        x2={radius * Math.cos(i * angleBetweenAxes - Math.PI / 2 + Math.PI)}
+        y2={radius * Math.sin(i * angleBetweenAxes - Math.PI / 2 + Math.PI)}
+        stroke="gray"
+      />
+      <text
+        x={radius * Math.cos(i * angleBetweenAxes - Math.PI / 2 + Math.PI / 2)}
+        y={radius * Math.sin(i * angleBetweenAxes - Math.PI / 2 + Math.PI / 2)}
+        text-anchor="middle"
+        alignment-baseline="middle"
+      >
+        {axisName}
+      </text>
+    {/each}
+
+    <!-- Draw genes -->
     {#each genes as gene}
-      <!-- Draw genes as circles based on their properties -->
-      {#if gene.axes === 'regulator'}
-        <circle cx="{gene.x}" cy="{gene.y}" r="2" fill="red" />
-      {:else if gene.axes === 'workhorse'}
-        <circle cx="{gene.x}" cy="{gene.y}" r="2" fill="green" />
-      {:else if gene.axes === 'manager'}
-        <circle cx="{gene.x}" cy="{gene.y}" r="2" fill="yellow" />
+      {#if gene.gene_start > 0}
+        <circle
+          class="gene-node"
+          cx={radius * Math.cos(axisNames.indexOf(gene.axes) * angleBetweenAxes - Math.PI / 2)}
+          cy={radius * Math.sin(axisNames.indexOf(gene.axes) * angleBetweenAxes - Math.PI / 2)}
+          r="5"
+        />
+        <text
+          class="gene-node-text"
+          x={radius * Math.cos(axisNames.indexOf(gene.axes) * angleBetweenAxes - Math.PI / 2)}
+          y={radius * Math.sin(axisNames.indexOf(gene.axes) * angleBetweenAxes - Math.PI / 2)}
+          text-anchor="middle"
+          alignment-baseline="middle"
+        >
+          {gene.ngn}
+        </text>
       {/if}
     {/each}
 
+    <!-- Draw interactions -->
     {#each interactions as interaction}
-      <!-- Draw interactions as quadratic Bezier curves between genes -->
-      <path
-        d={`M ${interaction.fromGene.x} ${interaction.fromGene.y} Q ${interaction.controlPointX} ${interaction.controlPointY} ${interaction.toGene.x} ${interaction.toGene.y}`}
-        fill="none"
-        opacity="0.3"
-        stroke="black"
+      <line
+        class="gene-edge"
+        x1={radius * Math.cos(axisNames.indexOf(interaction.from_gene.axes) * angleBetweenAxes - Math.PI / 2)}
+        y1={radius * Math.sin(axisNames.indexOf(interaction.from_gene.axes) * angleBetweenAxes - Math.PI / 2)}
+        x2={radius * Math.cos(axisNames.indexOf(interaction.to_gene.axes) * angleBetweenAxes - Math.PI / 2)}
+        y2={radius * Math.sin(axisNames.indexOf(interaction.to_gene.axes) * angleBetweenAxes - Math.PI / 2)}
       />
     {/each}
-  </svg>
-</div>
+  </g>
+</svg>
